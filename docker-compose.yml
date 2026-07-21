@@ -1,0 +1,97 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml  —  Supply Demand Agentic AI · Full Stack
+#
+# Services:
+#   api          → FastAPI backend  (port 8000)
+#   dashboard    → Streamlit UI     (port 8501)
+#
+# One-command launch:
+#   docker compose up --build
+#
+# With live reload (dev):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: supply-demand-api
+    image: supply-demand-api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # ── LLM ──────────────────────────────────────────────────────────────────
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - OPENAI_TEMPERATURE=${OPENAI_TEMPERATURE:-0.0}
+      # ── LangSmith (optional) ─────────────────────────────────────────────────
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-supply-demand-agentic-ai}
+      # ── App ──────────────────────────────────────────────────────────────────
+      - APP_ENV=${APP_ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      # ── Database ─────────────────────────────────────────────────────────────
+      - DATABASE_URL=sqlite:////app/data/supply_demand.db
+      # ── Supply chain config ───────────────────────────────────────────────────
+      - DEFAULT_SAFETY_STOCK_DAYS=${DEFAULT_SAFETY_STOCK_DAYS:-14}
+      - DEFAULT_LEAD_TIME_DAYS=${DEFAULT_LEAD_TIME_DAYS:-7}
+      - FORECAST_HORIZON_DAYS=${FORECAST_HORIZON_DAYS:-90}
+      - LOW_STOCK_THRESHOLD_PCT=${LOW_STOCK_THRESHOLD_PCT:-0.20}
+      - ENABLE_HUMAN_IN_THE_LOOP=${ENABLE_HUMAN_IN_THE_LOOP:-true}
+      - MAX_AGENT_ITERATIONS=${MAX_AGENT_ITERATIONS:-10}
+    volumes:
+      # Persist SQLite database across container restarts
+      - db-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - supply-demand-net
+
+
+  # ── Streamlit Dashboard ──────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: supply-demand-dashboard
+    image: supply-demand-dashboard:latest
+    ports:
+      - "8501:8501"
+    environment:
+      # Point dashboard at the API service (Docker internal DNS)
+      - API_BASE_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - supply-demand-net
+
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  db-data:
+    driver: local
+    name: supply-demand-db
+
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  supply-demand-net:
+    driver: bridge
+    name: supply-demand-network

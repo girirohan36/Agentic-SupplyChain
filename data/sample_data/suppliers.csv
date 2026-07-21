@@ -1,0 +1,6 @@
+supplier_id,name,country,lead_time_days,min_order_qty,unit_cost,reliability_score,status,contact_email
+SUP-001,TechSource Global Ltd,China,14,50,18.32,0.97,preferred,orders@techsource.example.com
+SUP-002,FastShip Domestic LLC,USA,3,100,22.39,0.99,preferred,supply@fastship.example.com
+SUP-003,EuroTrade Wholesale GmbH,Germany,21,25,19.33,0.92,active,procurement@eurotrade.example.com
+SUP-004,QuickFulfill Partners Inc,USA,5,200,21.37,0.95,active,ops@quickfulfill.example.com
+SUP-005,Pacific Rim Distributors,Vietnam,28,30,16.69,0.88,active,sales@pacificrim.example.com

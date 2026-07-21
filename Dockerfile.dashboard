@@ -1,0 +1,45 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.dashboard  —  Supply Demand Agentic AI · Streamlit service
+#
+# Single-stage build (Streamlit is lightweight).
+#
+# Usage:
+#   docker build -f Dockerfile.dashboard -t supply-demand-dashboard .
+#   docker run -p 8501:8501 supply-demand-dashboard
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM python:3.11-slim
+
+# Security: non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+WORKDIR /app
+
+# Install only dashboard dependencies
+RUN pip install --no-cache-dir --quiet \
+    streamlit>=1.35.0 \
+    plotly>=5.22.0 \
+    requests>=2.32.0 \
+    pandas>=2.2.0
+
+# Copy dashboard + shared config
+COPY dashboard/ ./dashboard/
+COPY config/    ./config/
+
+# Non-root ownership
+RUN chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8501
+
+# Streamlit config — disable usage stats, set server options
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
+    STREAMLIT_SERVER_PORT=8501 \
+    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
+    STREAMLIT_SERVER_HEADLESS=true \
+    STREAMLIT_SERVER_ENABLE_CORS=false
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')" || exit 1
+
+CMD ["streamlit", "run", "dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
